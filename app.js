@@ -99,13 +99,13 @@ async function ensureCloudSession(client) {
     cloudAuthenticated = true;
     return true;
   }
-  const email = window.prompt("クラウド同期用のメールアドレスを入力してください");
+  const email = window.prompt("クラウド同期用のメールアドレスを入力してください（GitHub IDではなく、Supabase Authenticationに登録したメールアドレス）");
   if (!email) return false;
-  const password = window.prompt("クラウド同期用のパスワードを入力してください");
+  const password = window.prompt("クラウド同期用のパスワードを入力してください（Supabase Authenticationのユーザーパスワード）");
   if (!password) return false;
   const { error } = await client.auth.signInWithPassword({ email, password });
   if (error) {
-    window.alert("クラウドログインに失敗しました。メールアドレスとパスワードを確認してください。");
+    window.alert(`クラウドログインに失敗しました。\n\n理由: ${error.message}\n\n入力するのはGitHubのID/パスワードではなく、Supabase Authenticationに作成したユーザーのメールアドレスとパスワードです。\nログインに失敗している間は、このPCのブラウザ内保存だけで動きます。`);
     console.warn("クラウドログインに失敗しました", error);
     return false;
   }

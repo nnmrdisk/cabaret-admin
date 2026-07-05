@@ -74,8 +74,22 @@ https://ユーザー名.github.io/cabaret-admin/
 ## 4. 他パソコンから使う
 
 1. GitHub PagesのURLを開きます。
-2. Supabaseのログイン用メールアドレスとパスワードを入力します。
-3. Supabaseの `cabaret_app_state` に保存された同じデータを読み込みます。
+2. ログインなしで、Supabaseの `cabaret_app_state` に保存された同じデータを読み込みます。
+3. 他のパソコンでも同じURLを開けば、同じデータを編集できます。
+
+ログイン付き設定に戻した場合だけ、Supabaseの `Authentication > URL Configuration` にGitHub PagesのURLを登録してください。
+
+```text
+Site URL: https://nnmrdisk.github.io
+Redirect URLs: https://nnmrdisk.github.io/**
+```
+
+リポジトリ名付きURLの場合は、実際のURLに合わせます。
+
+```text
+Site URL: https://nnmrdisk.github.io/cabaret-admin/
+Redirect URLs: https://nnmrdisk.github.io/cabaret-admin/**
+```
 
 ## 5. 修正したあと更新する
 
