@@ -9,6 +9,7 @@
 <body>
   <div class="app-shell">
     <aside class="sidebar" aria-label="メインメニュー">
+      <button class="sidebar-toggle" type="button" id="sidebarToggle" aria-label="メニューを折りたたむ">☰</button>
       <div class="brand">
         <div class="brand-mark" aria-hidden="true">N</div>
         <div>
@@ -53,7 +54,10 @@
       <header class="topbar">
         <div>
           <p class="page-kicker">管理者画面</p>
-          <h2 id="pageTitle">本日の店舗状況</h2>
+          <div class="title-line">
+            <h2 id="pageTitle">本日の店舗状況</h2>
+            <span id="businessDateLabel"></span>
+          </div>
         </div>
         <div class="topbar-actions">
           <label class="search-box">
@@ -70,9 +74,9 @@
       <section class="view active" id="dashboardView" aria-labelledby="pageTitle">
         <div class="metric-grid">
           <article class="metric">
-            <span class="metric-label">本日の組数/客数</span>
+            <span class="metric-label">本日の総組数、総客数</span>
             <strong id="todayGroupsGuests">0組 / 0名</strong>
-            <small id="closedGroupsGuests">会計済 0組</small>
+            <small id="activeGroupsGuests">店内 0組 / 0名</small>
           </article>
           <article class="metric">
             <span class="metric-label">本日売上</span>
@@ -80,18 +84,13 @@
             <small id="salesDelta">未会計 0卓</small>
           </article>
           <article class="metric">
-            <span class="metric-label">出勤</span>
-            <strong id="attendanceCount">0名</strong>
-            <small>予定キャスト含む</small>
-          </article>
-          <article class="metric">
-            <span class="metric-label">指名</span>
-            <strong id="nominationCount">0件</strong>
-            <small>本日の指名予定</small>
+            <span class="metric-label">指名状況</span>
+            <strong id="nominationCount">0 / 0 / 0</strong>
+            <small>同伴本数 / 指名本数 / 場内本数</small>
           </article>
         </div>
 
-        <div class="dashboard-layout">
+        <div class="dashboard-stack">
           <section class="panel">
             <div class="section-heading">
               <div>
@@ -100,20 +99,19 @@
               </div>
               <div class="segmented" role="group" aria-label="卓表示">
                 <button class="segment active" type="button" data-filter="open">未会計</button>
-                <button class="segment" type="button" data-filter="closed">会計済み</button>
+                <button class="segment" type="button" data-filter="closed">退店済み</button>
                 <button class="segment" type="button" data-filter="all">全て</button>
               </div>
             </div>
             <div class="table-grid" id="tableGrid"></div>
           </section>
 
-          <section class="panel">
+          <section class="panel attendance-panel">
             <div class="section-heading">
               <div>
                 <p>Schedule</p>
                 <h3>本日の出勤</h3>
               </div>
-              <button class="ghost-button" type="button" id="addCastButton">追加</button>
             </div>
             <div class="cast-list" id="todayCastList"></div>
           </section>
@@ -161,16 +159,16 @@
         </div>
         <div class="sales-summary">
           <div>
+            <span>現状売上</span>
+            <strong id="currentSales">¥0</strong>
+          </div>
+          <div>
+            <span>組単価</span>
+            <strong id="averageGroupSpend">¥0</strong>
+          </div>
+          <div>
             <span>客単価</span>
             <strong id="averageSpend">¥0</strong>
-          </div>
-          <div>
-            <span>ボトル売上</span>
-            <strong id="bottleSales">¥0</strong>
-          </div>
-          <div>
-            <span>ドリンク売上</span>
-            <strong id="drinkSales">¥0</strong>
           </div>
         </div>
         <div class="data-table" id="salesTable"></div>
@@ -211,6 +209,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="cloud-config.js?v=20260705-3"></script>
-  <script src="app.js?v=20260705-31"></script>
+  <script src="app.js?v=20260705-32"></script>
 </body>
 </html>

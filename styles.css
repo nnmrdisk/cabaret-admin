@@ -42,6 +42,10 @@ button {
   min-height: 100vh;
 }
 
+.app-shell.sidebar-collapsed {
+  grid-template-columns: 76px minmax(0, 1fr);
+}
+
 .sidebar {
   display: flex;
   flex-direction: column;
@@ -49,6 +53,29 @@ button {
   padding: 24px 18px;
   background: #171b21;
   color: #fff;
+}
+
+.sidebar-toggle {
+  width: 40px;
+  min-height: 34px;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.sidebar-collapsed .brand div:not(.brand-mark),
+.sidebar-collapsed .nav-item span:last-child,
+.sidebar-collapsed .shift-card div {
+  display: none;
+}
+
+.sidebar-collapsed .sidebar {
+  align-items: center;
+}
+
+.sidebar-collapsed .nav-item {
+  grid-template-columns: 1fr;
 }
 
 .brand {
@@ -170,6 +197,19 @@ button {
   font-size: 26px;
 }
 
+.title-line {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+#businessDateLabel {
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 700;
+}
+
 .topbar-actions {
   display: flex;
   gap: 10px;
@@ -242,7 +282,7 @@ button {
 
 .metric-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
   margin-bottom: 16px;
 }
@@ -278,9 +318,9 @@ button {
   color: var(--muted);
 }
 
-.dashboard-layout {
+.dashboard-stack {
   display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(310px, 0.8fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
 }
 
@@ -329,7 +369,7 @@ button {
 
 .table-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 12px;
 }
 
@@ -353,6 +393,12 @@ button {
   animation: extensionPulse 1s ease-in-out infinite;
 }
 
+.table-card.extension-overdue {
+  border-color: #2868c7;
+  background: #eef5ff;
+  animation: overduePulse 1s ease-in-out infinite;
+}
+
 @keyframes extensionPulse {
   0%,
   100% {
@@ -361,6 +407,17 @@ button {
 
   50% {
     box-shadow: 0 0 0 4px rgba(223, 61, 61, 0.28);
+  }
+}
+
+@keyframes overduePulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(40, 104, 199, 0);
+  }
+
+  50% {
+    box-shadow: 0 0 0 4px rgba(40, 104, 199, 0.3);
   }
 }
 
@@ -395,8 +452,17 @@ button {
 }
 
 .table-no {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
   font-size: 18px;
   font-weight: 800;
+}
+
+.table-no small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .pill {
@@ -433,8 +499,8 @@ button {
   align-items: baseline;
   justify-content: center;
   gap: 8px;
-  min-width: 118px;
-  padding: 6px 10px;
+  min-width: 92px;
+  padding: 5px 8px;
   border: 1px solid #b8d5ee;
   border-radius: 8px;
   background: #eef7ff;
@@ -454,7 +520,7 @@ button {
 
 .table-card .entry-time-display strong {
   color: var(--blue);
-  font-size: 28px;
+  font-size: 22px;
   line-height: 1;
 }
 
@@ -478,12 +544,12 @@ button {
 
 .extension-button {
   min-height: 30px;
-  padding: 0 10px;
+  padding: 0 8px;
 }
 
 .extension-cancel-button {
   min-height: 30px;
-  padding: 0 10px;
+  padding: 0 8px;
   color: var(--danger);
   border-color: #e7b8b8;
 }
@@ -499,8 +565,8 @@ button {
   align-items: baseline;
   justify-content: center;
   gap: 7px;
-  min-width: 132px;
-  padding: 6px 10px;
+  min-width: 112px;
+  padding: 5px 8px;
   border: 1px solid #d9c491;
   border-radius: 8px;
   background: #fff8e8;
@@ -514,12 +580,12 @@ button {
 
 .table-card .extension-time-display strong {
   color: #775708;
-  font-size: 24px;
+  font-size: 20px;
   line-height: 1;
 }
 
 .table-card strong {
-  font-size: 22px;
+  font-size: 20px;
 }
 
 .mini-button {
@@ -543,12 +609,39 @@ button {
 .cast-list {
   display: grid;
   gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
 }
 
 .cast-row {
   padding: 11px;
   border: 1px solid var(--line);
   border-radius: 8px;
+}
+
+.shift-controls {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.inline-select {
+  min-height: 32px;
+  padding: 4px 7px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.empty-note {
+  margin: 0;
+  color: var(--muted);
+}
+
+.row-actions {
+  display: inline-flex;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 .profile {
@@ -595,6 +688,10 @@ button {
   min-height: 62px;
   padding: 12px 16px;
   border-top: 1px solid var(--line);
+}
+
+.sales-row {
+  grid-template-columns: 0.8fr 1fr 1.1fr 1.1fr 1fr 1.2fr 1fr 0.8fr;
 }
 
 .data-row.header {
@@ -820,10 +917,15 @@ dialog::backdrop {
   gap: 8px;
 }
 
-.bottle-row,
-.payment-row {
+.bottle-row {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(100px, 0.8fr) 38px;
+  gap: 8px;
+}
+
+.payment-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(90px, 0.7fr) minmax(0, 1.2fr) 38px;
   gap: 8px;
 }
 
@@ -859,7 +961,7 @@ dialog::backdrop {
   }
 
   .metric-grid,
-  .dashboard-layout,
+  .dashboard-stack,
   .customer-board {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -904,13 +1006,14 @@ dialog::backdrop {
   }
 
   .metric-grid,
-  .dashboard-layout,
+    .dashboard-stack,
   .table-grid,
   .customer-board,
   .sales-summary,
   .form-grid,
   .bottle-row,
-  .payment-row,
+    .payment-row,
+    .sales-row,
   .entry-call-row,
   .nomination-row {
     grid-template-columns: 1fr;

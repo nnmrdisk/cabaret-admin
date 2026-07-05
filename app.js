@@ -36,6 +36,7 @@ let dialogMode = "sale";
 let accountingTableId = null;
 let deletingTableId = null;
 let editingTableId = null;
+let editingCastId = null;
 
 const tableOptions = [
   "A卓", "C卓", "D卓", "F卓", "1卓", "5卓", "7卓", "9卓", "11卓", "15卓",
@@ -58,6 +59,18 @@ const viewTitles = {
 };
 
 const yen = new Intl.NumberFormat("ja-JP", { style: "currency", currency: "JPY", maximumFractionDigits: 0 });
+
+const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
+const attendanceStatuses = ["出勤", "当欠", "無欠", "出欠"];
+
+function timeRangeOptions(center, before = 180, after = 360) {
+  const base = timeToMinutes(center);
+  const options = [];
+  for (let offset = -before; offset <= after; offset += 30) {
+    options.push(minutesToTime(base + offset));
+  }
+  return options;
+}
 
 function loadState() {
   const saved = localStorage.getItem(storageKey);
@@ -170,7 +183,7 @@ function castPay(cast) {
 }
 
 function activeCasts() {
-  return state.casts.filter((cast) => cast.status !== "退勤");
+  return state.casts.filter(isWorkingToday);
 }
 
 function tableCasts(table) {
@@ -230,7 +243,8 @@ function paymentDisplay(table) {
   if (!payments.length) return "未入力";
   return payments.map((payment) => {
     const amount = Number(payment.amount || 0);
-    return amount > 0 ? `${payment.method} ${yen.format(amount)}` : payment.method;
+    const detail = payment.method?.startsWith("カード") && payment.cardName ? ` / 名義 ${payment.cardName}` : payment.method === "売掛" && payment.responsible ? ` / 責任者 ${payment.responsible}` : "";
+    return amount > 0 ? `${payment.method} ${yen.format(amount)}${detail}` : payment.method;
   }).join("、");
 }
 
@@ -248,14 +262,26 @@ function callWarningTime(table) {
   return minutesToTime(entryMinutes + 60 + extensionMinutes);
 }
 
-function extensionWarningActive(table) {
-  if (!table.call || table.status === "closed") return false;
-  const target = timeToMinutes(callWarningTime(table));
+function minutesUntil(time) {
+  const target = timeToMinutes(time);
   if (target === null) return false;
   const now = currentMinutes();
   const adjustedTarget = target < now - 12 * 60 ? target + 24 * 60 : target;
   const adjustedNow = now > adjustedTarget ? now - 24 * 60 : now;
-  return adjustedNow >= adjustedTarget - 10 && adjustedNow <= adjustedTarget;
+  return adjustedTarget - adjustedNow;
+}
+
+function extensionWarningActive(table) {
+  if (!table.call || table.status === "closed") return false;
+  const remaining = minutesUntil(callWarningTime(table));
+  return remaining !== false && remaining >= 0 && remaining <= 10;
+}
+
+function tableOverdueActive(table) {
+  if (table.status === "closed") return false;
+  const callRemaining = table.call ? minutesUntil(callWarningTime(table)) : false;
+  const exitRemaining = table.exitTime ? minutesUntil(table.exitTime) : false;
+  return (callRemaining !== false && callRemaining < 0) || (exitRemaining !== false && exitRemaining < 0);
 }
 
 function extensionHistory(table) {
@@ -265,10 +291,45 @@ function extensionHistory(table) {
 
 function defaultExitTime(table) {
   if (table.call) {
-    const extended = extensionTime(table);
-    if (extended) return extended;
+    const callTime = callWarningTime(table);
+    if (callTime) return callTime;
   }
   return nearestExitTime(table.entryTime);
+}
+
+function isClosed(table) {
+  return table.status === "closed";
+}
+
+function activeTables() {
+  return state.tables.filter((table) => !isClosed(table));
+}
+
+function isWorkingToday(cast) {
+  if (cast.todayWorking !== undefined) return Boolean(cast.todayWorking);
+  return cast.status !== "退勤";
+}
+
+function castAttendanceStatus(cast) {
+  return cast.attendanceStatus || (cast.status === "退勤" ? "出欠" : "出勤");
+}
+
+function castStats(name) {
+  const openTables = activeTables();
+  const companion = openTables.reduce((sum, table) => sum + (companionCasts(table).includes(name) ? 1 : 0), 0);
+  const nominations = openTables.reduce((sum, table) => sum + (tableCasts(table).includes(name) ? 1 : 0), 0);
+  const inStore = openTables.reduce((sum, table) => sum + (inStoreNominations(table).includes(name) ? 1 : 0), 0);
+  return { companion, nominations, inStore };
+}
+
+function businessDateLabel() {
+  const now = new Date();
+  if (now.getHours() < 8) {
+    now.setDate(now.getDate() - 1);
+  }
+  const month = now.getMonth() + 1;
+  const date = now.getDate();
+  return `${month}/${date}（${weekdays[now.getDay()]}）`;
 }
 
 function timeToMinutes(time) {
@@ -317,27 +378,29 @@ function renderMetrics() {
   const openCount = state.tables.filter((table) => table.status === "open").length;
   const groupCount = state.tables.length;
   const guestCount = state.tables.reduce((sum, table) => sum + Number(table.guests || 0), 0);
-  const closedCount = state.tables.filter((table) => table.status === "closed").length;
-  const attendance = state.casts.filter((cast) => cast.status !== "退勤").length;
-  const nominations = state.casts.reduce((sum, cast) => sum + Number(cast.nominations), 0);
+  const activeGroupCount = activeTables().length;
+  const activeGuestCount = activeTables().reduce((sum, table) => sum + Number(table.guests || 0), 0);
+  const companionCount = activeTables().reduce((sum, table) => sum + companionCasts(table).length, 0);
+  const nominationCount = activeTables().reduce((sum, table) => sum + tableCasts(table).filter((name) => name && name !== "フリー").length, 0);
+  const inStoreCount = activeTables().reduce((sum, table) => sum + inStoreNominations(table).length, 0);
 
   document.querySelector("#todayGroupsGuests").textContent = `${groupCount}組 / ${guestCount}名`;
-  document.querySelector("#closedGroupsGuests").textContent = `会計済 ${closedCount}組`;
+  document.querySelector("#activeGroupsGuests").textContent = `店内 ${activeGroupCount}組 / ${activeGuestCount}名`;
   document.querySelector("#todaySales").textContent = yen.format(sales);
   document.querySelector("#salesDelta").textContent = `未会計 ${openCount}卓`;
-  document.querySelector("#attendanceCount").textContent = `${attendance}名`;
-  document.querySelector("#nominationCount").textContent = `${nominations}件`;
+  document.querySelector("#nominationCount").textContent = `${companionCount} / ${nominationCount} / ${inStoreCount}`;
+  document.querySelector("#businessDateLabel").textContent = businessDateLabel();
 }
 
 function renderTables() {
   const grid = document.querySelector("#tableGrid");
   const tables = state.tables.filter((table) => tableFilter === "all" || table.status === tableFilter);
   grid.innerHTML = tables.map((table) => `
-    <article class="table-card ${table.status === "closed" ? "closed" : ""} ${extensionWarningActive(table) ? "extension-warning" : ""}">
+    <article class="table-card ${isClosed(table) ? "closed" : ""} ${extensionWarningActive(table) ? "extension-warning" : ""} ${tableOverdueActive(table) ? "extension-overdue" : ""}">
       <header>
-        <span class="table-no">${table.table}</span>
+        <span class="table-no">${table.table}<small>${table.guests}名</small></span>
         <div class="table-status-actions">
-          <span class="pill ${table.status === "closed" ? "closed" : "warning"}">${table.status === "closed" ? "会計済" : "未会計"}</span>
+          <span class="pill ${isClosed(table) ? "closed" : "warning"}">${isClosed(table) ? "退店済" : "未会計"}</span>
           <button class="status-edit-button" type="button" data-edit-table="${table.id}">修正</button>
         </div>
       </header>
@@ -346,26 +409,26 @@ function renderTables() {
           <div class="time-control-row ${table.call ? "is-call" : "is-normal"}">
             <div class="entry-time-display ${table.call ? "call" : ""}"><span>入店</span><strong>${table.entryTime}</strong></div>
             ${table.call ? `
+              <div class="extension-time-display"><span>${extensionTime(table) ? "延長時間" : "セット時間"}</span><strong>${extensionTime(table) || callWarningTime(table)}</strong></div>
               <div class="extension-actions">
                 <button class="mini-button extension-button" type="button" data-extend-table="${table.id}" data-extend-minutes="30">30分</button>
                 <button class="mini-button extension-button" type="button" data-extend-table="${table.id}" data-extend-minutes="60">60分</button>
                 <button class="mini-button extension-cancel-button" type="button" data-cancel-extension-table="${table.id}" ${Number(table.extensionMinutes || 0) <= 0 ? "disabled" : ""}>延長取消</button>
               </div>
-              ${extensionTime(table) ? `<div class="extension-time-display"><span>延長時間</span><strong>${extensionTime(table)}</strong></div>` : ""}
             ` : ""}
           </div>
         ` : ""}
-        <p>${table.customer} / ${table.guests}名</p>
-        <strong>${yen.format(totalSale(table))}</strong>
+        <p>${table.customer}</p>
         <p>指名 ${castDisplay(table)}</p>
         ${inStoreNominations(table).length ? `<p>場内 ${inStoreNominationDisplay(table)}</p>` : ""}
+        <strong>${yen.format(totalSale(table))}</strong>
         ${bottleEntries(table).length ? `<p>ボトル ${bottleDisplay(table)}</p>` : ""}
         ${visiblePaymentEntries(table).length ? `<p>支払 ${paymentDisplay(table)}</p>` : ""}
-        ${table.status === "closed" && table.exitTime ? `<p>退店 ${table.exitTime}</p>` : ""}
+        ${isClosed(table) && table.exitTime ? `<p>退店 ${table.exitTime}</p>` : ""}
       </div>
       <div class="table-actions">
-        <button class="mini-button" type="button" data-accounting-table="${table.id}">会計入力</button>
-        <button class="mini-button" type="button" data-close-table="${table.id}">${table.status === "closed" ? "未会計に戻す" : "会計済にする"}</button>
+        <button class="mini-button" type="button" data-accounting-table="${table.id}">入力</button>
+        <button class="mini-button" type="button" data-close-table="${table.id}">${isClosed(table) ? "未会計に戻す" : "退店済にする"}</button>
         <button class="mini-button danger-button" type="button" data-delete-table="${table.id}">削除</button>
       </div>
     </article>
@@ -374,33 +437,40 @@ function renderTables() {
 
 function renderTodayCasts() {
   const list = document.querySelector("#todayCastList");
-  list.innerHTML = state.casts.map((cast) => `
+  const workingCasts = state.casts.filter(isWorkingToday);
+  list.innerHTML = workingCasts.map((cast) => {
+    const stats = castStats(cast.name);
+    return `
     <div class="cast-row">
       <div class="profile">
         <span class="avatar">${initials(cast.name)}</span>
         <div>
           <strong>${cast.name}</strong>
-          <span>${cast.role} / 指名 ${cast.nominations}件</span>
+          <span>指名 ${stats.nominations}本 / 場内 ${stats.inStore}本</span>
         </div>
       </div>
-      <span class="pill ${cast.status === "出勤" ? "closed" : cast.status === "予定" ? "warning" : ""}">${cast.status}</span>
+      <div class="shift-controls">
+        ${selectInline(`shiftStart-${cast.id}`, cast.shiftStart || "20:00", timeRangeOptions("20:00"))}
+        ${selectInline(`shiftEnd-${cast.id}`, cast.shiftEnd || "23:30", timeRangeOptions("23:30"))}
+        ${selectInline(`attendanceStatus-${cast.id}`, castAttendanceStatus(cast), attendanceStatuses)}
+      </div>
     </div>
-  `).join("");
+  `}).join("") || `<p class="empty-note">本日の出勤キャストは未選択です。</p>`;
 }
 
 function renderCastTable() {
   const table = document.querySelector("#castTable");
   table.innerHTML = `
     <div class="data-row header">
-      <span>名前</span><span>状態</span><span>時給</span><span>バック率</span><span>操作</span>
+      <span>名前</span><span>本日</span><span>区分</span><span>時給</span><span>操作</span>
     </div>
     ${state.casts.map((cast) => `
       <div class="data-row">
         <span class="profile"><span class="avatar">${initials(cast.name)}</span><strong>${cast.name}</strong></span>
-        <span>${cast.status} / ${cast.role}</span>
+        <label class="toggle"><input type="checkbox" data-cast-today="${cast.id}" ${isWorkingToday(cast) ? "checked" : ""}><span>出勤</span></label>
+        <span>${cast.role}</span>
         <span>${yen.format(cast.hourly)}</span>
-        <span>${cast.back}%</span>
-        <button class="mini-button" type="button" data-toggle-cast="${cast.id}">状態変更</button>
+        <span class="row-actions"><button class="mini-button" type="button" data-edit-cast="${cast.id}">編集</button><button class="mini-button danger-button" type="button" data-delete-cast="${cast.id}">削除</button></span>
       </div>
     `).join("")}
   `;
@@ -433,24 +503,26 @@ function renderCustomers() {
 function renderSales() {
   const totalGuests = state.tables.reduce((sum, table) => sum + Number(table.guests), 0);
   const total = state.tables.reduce((sum, table) => sum + totalSale(table), 0);
-  const bottles = state.tables.reduce((sum, table) => sum + Number(table.bottles), 0);
-  const drinks = state.tables.reduce((sum, table) => sum + Number(table.drinks), 0);
+  const totalGroups = state.tables.length;
 
+  document.querySelector("#currentSales").textContent = yen.format(total);
+  document.querySelector("#averageGroupSpend").textContent = yen.format(totalGroups ? Math.round(total / totalGroups) : 0);
   document.querySelector("#averageSpend").textContent = yen.format(totalGuests ? Math.round(total / totalGuests) : 0);
-  document.querySelector("#bottleSales").textContent = yen.format(bottles);
-  document.querySelector("#drinkSales").textContent = yen.format(drinks);
 
   document.querySelector("#salesTable").innerHTML = `
-    <div class="data-row header">
-      <span>卓</span><span>顧客</span><span>担当</span><span>金額</span><span>状態</span>
+    <div class="data-row sales-row header">
+      <span>卓</span><span>入退店</span><span>顧客</span><span>指名</span><span>場内</span><span>ボトル</span><span>会計金額</span><span>状態</span>
     </div>
     ${state.tables.map((table) => `
-      <div class="data-row">
-        <span><strong>${table.table}</strong> / ${table.guests}名${table.exitTime ? ` / 退店 ${table.exitTime}` : ""}</span>
+      <div class="data-row sales-row">
+        <span><strong>${table.table}</strong> / ${table.guests}名</span>
+        <span>${table.entryTime || "-"} / ${table.exitTime || "-"}</span>
         <span>${table.customer}</span>
-        <span>${castDisplay(table)}${inStoreNominations(table).length ? ` / 場内 ${inStoreNominationDisplay(table)}` : ""}</span>
+        <span>${castDisplay(table)}</span>
+        <span>${inStoreNominationDisplay(table)}</span>
+        <span>${bottleDisplay(table)}</span>
         <span>${yen.format(totalSale(table))}</span>
-        <span class="pill ${table.status === "closed" ? "closed" : "warning"}">${table.status === "closed" ? "会計済" : "未会計"}</span>
+        <span class="pill ${isClosed(table) ? "closed" : "warning"}">${isClosed(table) ? "退店済" : "未会計"}</span>
       </div>
     `).join("")}
   `;
@@ -485,11 +557,20 @@ function switchView(view) {
   });
 }
 
+function selectInline(name, selectedValue, options) {
+  return `
+    <select class="inline-select" name="${name}" data-inline-select="${name}">
+      ${options.map((option) => `<option value="${option}" ${option === selectedValue ? "selected" : ""}>${option}</option>`).join("")}
+    </select>
+  `;
+}
+
 function openDialog(mode) {
   dialogMode = mode;
   accountingTableId = null;
   deletingTableId = null;
   editingTableId = null;
+  editingCastId = null;
   const dialog = document.querySelector("#entryDialog");
   const title = document.querySelector("#dialogTitle");
   const kicker = document.querySelector("#dialogKicker");
@@ -503,8 +584,7 @@ function openDialog(mode) {
       ${field("role", "区分", "text", "レギュラー")}
       ${field("hourly", "時給", "number", "3500")}
       ${field("back", "バック率（%）", "number", "15")}
-      ${selectField("status", "状態", ["出勤", "予定", "退勤"])}
-      ${field("nominations", "指名件数", "number", "0")}
+      ${checkboxField("todayWorking", "本日の出勤", true)}
     `;
   } else if (mode === "customer") {
     kicker.textContent = "Customer";
@@ -533,6 +613,29 @@ function openDialog(mode) {
   if (mode === "sale") {
     document.querySelector("#entryTime").value = currentTimeValue();
   }
+  dialog.showModal();
+}
+
+function openCastEditDialog(castId) {
+  dialogMode = "editCast";
+  editingCastId = castId;
+  const cast = state.casts.find((item) => item.id === castId);
+  const dialog = document.querySelector("#entryDialog");
+  document.querySelector("#dialogKicker").textContent = "Cast";
+  document.querySelector("#dialogTitle").textContent = `${cast.name} 編集`;
+  document.querySelector("#dialogFields").innerHTML = `
+    ${field("name", "名前", "text", "例: 花音", { value: cast.name })}
+    ${field("role", "区分", "text", "レギュラー", { value: cast.role || "" })}
+    ${field("hourly", "時給", "number", "3500", { value: String(cast.hourly || 0) })}
+    ${field("back", "バック率（%）", "number", "15", { value: String(cast.back || 0) })}
+    ${checkboxField("todayWorking", "本日の出勤", isWorkingToday(cast))}
+  `;
+  document.querySelector("#entryForm").reset();
+  document.querySelector("#name").value = cast.name;
+  document.querySelector("#role").value = cast.role || "";
+  document.querySelector("#hourly").value = cast.hourly || 0;
+  document.querySelector("#back").value = cast.back || 0;
+  document.querySelector("#todayWorking").checked = isWorkingToday(cast);
   dialog.showModal();
 }
 
@@ -641,6 +744,18 @@ function entryTimeField(value = "", isCall = false) {
           <span>コール</span>
         </label>
       </div>
+    </div>
+  `;
+}
+
+function checkboxField(name, label, checked = false) {
+  return `
+    <div class="field">
+      <label for="${name}">${label}</label>
+      <label class="call-check form-check">
+        <input id="${name}" name="${name}" type="checkbox" value="1" ${checked ? "checked" : ""}>
+        <span>${label}</span>
+      </label>
     </div>
   `;
 }
@@ -773,12 +888,15 @@ function paymentField(table) {
 function paymentRow(payment = {}) {
   const methods = ["現金", "カード（CAT）", "カード（楽天）", "売掛"];
   const selectedMethod = payment.method || "現金";
+  const detailValue = selectedMethod === "売掛" ? payment.responsible || "" : payment.cardName || "";
+  const detailPlaceholder = selectedMethod === "売掛" ? "責任者名（必須）" : selectedMethod.startsWith("カード") ? "カード名義（未入力可）" : "補足";
   return `
     <div class="payment-row">
       <select name="paymentMethods" required>
         ${methods.map((method) => `<option value="${method}" ${method === selectedMethod ? "selected" : ""}>${method}</option>`).join("")}
       </select>
       <input name="paymentAmounts" type="number" min="0" placeholder="金額" value="${payment.amount || ""}">
+      <input name="paymentDetails" type="text" placeholder="${detailPlaceholder}" value="${detailValue}" ${selectedMethod === "売掛" ? "required" : ""}>
       <button class="icon-button remove-payment" type="button" aria-label="支払方法欄を削除">×</button>
     </div>
   `;
@@ -845,6 +963,17 @@ function handleSubmit(event) {
     table.casts = casts;
     table.companionCasts = companions;
     editingTableId = null;
+  } else if (dialogMode === "editCast") {
+    const cast = state.casts.find((item) => item.id === editingCastId);
+    cast.name = values.name.trim();
+    cast.role = values.role.trim();
+    cast.hourly = Number(values.hourly || 0);
+    cast.back = Number(values.back || 0);
+    cast.todayWorking = values.todayWorking === "1";
+    if (!cast.shiftStart) cast.shiftStart = "20:00";
+    if (!cast.shiftEnd) cast.shiftEnd = "23:30";
+    if (!cast.attendanceStatus) cast.attendanceStatus = "出勤";
+    editingCastId = null;
   } else if (dialogMode === "accounting") {
     const table = state.tables.find((item) => item.id === accountingTableId);
     const inStore = formData.getAll("inStoreNominations").filter((name) => name && name !== "なし");
@@ -856,9 +985,17 @@ function handleSubmit(event) {
     })).filter((bottle) => bottle.name || bottle.amount > 0);
     const paymentMethods = formData.getAll("paymentMethods");
     const paymentAmounts = formData.getAll("paymentAmounts");
+    const paymentDetails = formData.getAll("paymentDetails");
+    const missingReceivable = paymentMethods.some((method, index) => method === "売掛" && !String(paymentDetails[index] || "").trim());
+    if (missingReceivable) {
+      window.alert("売掛の場合は責任者名を入力してください。");
+      return;
+    }
     const payments = paymentMethods.map((method, index) => ({
       method: String(method).trim(),
-      amount: Number(paymentAmounts[index] || 0)
+      amount: Number(paymentAmounts[index] || 0),
+      cardName: String(method).startsWith("カード") ? String(paymentDetails[index] || "").trim() : "",
+      responsible: method === "売掛" ? String(paymentDetails[index] || "").trim() : ""
     })).filter((payment) => payment.method || payment.amount > 0);
     table.exitTime = values.exitTime;
     table.accountingAmount = Number(values.accountingAmount);
@@ -869,12 +1006,16 @@ function handleSubmit(event) {
   } else if (dialogMode === "cast") {
     state.casts.push({
       id: Date.now(),
-      name: values.name,
-      status: values.status,
-      role: values.role,
-      hourly: Number(values.hourly),
-      back: Number(values.back),
-      nominations: Number(values.nominations),
+      name: values.name.trim(),
+      status: values.todayWorking === "1" ? "出勤" : "退勤",
+      todayWorking: values.todayWorking === "1",
+      attendanceStatus: "出勤",
+      shiftStart: "20:00",
+      shiftEnd: "23:30",
+      role: values.role.trim(),
+      hourly: Number(values.hourly || 0),
+      back: Number(values.back || 0),
+      nominations: 0,
       hours: 5
     });
   } else if (dialogMode === "customer") {
@@ -936,7 +1077,8 @@ document.body.addEventListener("click", (event) => {
   const cancelExtensionButton = event.target.closest("[data-cancel-extension-table]");
   const deleteButton = event.target.closest("[data-delete-table]");
   const editButton = event.target.closest("[data-edit-table]");
-  const castButton = event.target.closest("[data-toggle-cast]");
+  const castEditButton = event.target.closest("[data-edit-cast]");
+  const castDeleteButton = event.target.closest("[data-delete-cast]");
   const addNominationButton = event.target.closest("#addNominationButton");
   const removeNominationButton = event.target.closest(".remove-nomination");
   const addInStoreNominationButton = event.target.closest("#addInStoreNominationButton");
@@ -989,12 +1131,17 @@ document.body.addEventListener("click", (event) => {
     openEditDialog(Number(editButton.dataset.editTable));
   }
 
-  if (castButton) {
-    const cast = state.casts.find((item) => item.id === Number(castButton.dataset.toggleCast));
-    const next = { "予定": "出勤", "出勤": "退勤", "退勤": "予定" };
-    cast.status = next[cast.status];
-    saveState();
-    render();
+  if (castEditButton) {
+    openCastEditDialog(Number(castEditButton.dataset.editCast));
+  }
+
+  if (castDeleteButton) {
+    const cast = state.casts.find((item) => item.id === Number(castDeleteButton.dataset.deleteCast));
+    if (cast && window.confirm(`${cast.name} を削除しますか？`)) {
+      state.casts = state.casts.filter((item) => item.id !== cast.id);
+      saveState();
+      render();
+    }
   }
 
   if (addNominationButton) {
@@ -1056,12 +1203,18 @@ document.body.addEventListener("click", (event) => {
       const row = removePaymentButton.closest(".payment-row");
       row.querySelector('[name="paymentMethods"]').value = "現金";
       row.querySelector('[name="paymentAmounts"]').value = "";
+      row.querySelector('[name="paymentDetails"]').value = "";
+      row.querySelector('[name="paymentDetails"]').required = false;
+      row.querySelector('[name="paymentDetails"]').placeholder = "補足";
     }
   }
 });
 
 document.querySelector("#globalSearch").addEventListener("input", renderCustomers);
 document.querySelector("#showInactive").addEventListener("change", renderPayroll);
+document.querySelector("#sidebarToggle").addEventListener("click", () => {
+  document.querySelector(".app-shell").classList.toggle("sidebar-collapsed");
+});
 document.querySelector("#openSaleButton").addEventListener("click", () => openDialog("sale"));
 document.querySelector("#openSaleButtonSecondary").addEventListener("click", () => openDialog("sale"));
 document.querySelector("#openCastButton").addEventListener("click", () => openDialog("cast"));
@@ -1073,6 +1226,47 @@ document.querySelector("#entryForm").addEventListener("submit", handleSubmit);
 document.querySelector("#entryForm").addEventListener("input", (event) => {
   if (event.target.id === "accountingAmount") {
     syncPaymentAmount();
+  }
+});
+document.body.addEventListener("change", (event) => {
+  const todayToggle = event.target.closest("[data-cast-today]");
+  const inlineSelect = event.target.closest("[data-inline-select]");
+  const paymentMethod = event.target.closest('select[name="paymentMethods"]');
+
+  if (todayToggle) {
+    const cast = state.casts.find((item) => item.id === Number(todayToggle.dataset.castToday));
+    cast.todayWorking = todayToggle.checked;
+    cast.status = todayToggle.checked ? "出勤" : "退勤";
+    if (!cast.shiftStart) cast.shiftStart = "20:00";
+    if (!cast.shiftEnd) cast.shiftEnd = "23:30";
+    if (!cast.attendanceStatus) cast.attendanceStatus = "出勤";
+    saveState();
+    render();
+  }
+
+  if (inlineSelect) {
+    const [field, id] = inlineSelect.dataset.inlineSelect.split("-");
+    const cast = state.casts.find((item) => item.id === Number(id));
+    if (cast) {
+      cast[field] = inlineSelect.value;
+      saveState();
+      renderTodayCasts();
+    }
+  }
+
+  if (paymentMethod) {
+    const row = paymentMethod.closest(".payment-row");
+    const detail = row.querySelector('[name="paymentDetails"]');
+    if (paymentMethod.value === "売掛") {
+      detail.placeholder = "責任者名（必須）";
+      detail.required = true;
+    } else if (paymentMethod.value.startsWith("カード")) {
+      detail.placeholder = "カード名義（未入力可）";
+      detail.required = false;
+    } else {
+      detail.placeholder = "補足";
+      detail.required = false;
+    }
   }
 });
 setInterval(renderTables, 60 * 1000);
