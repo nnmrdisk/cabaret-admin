@@ -37,6 +37,7 @@ let accountingTableId = null;
 let deletingTableId = null;
 let editingTableId = null;
 let editingCastId = null;
+const autoExtensionExitTime = "自動延長中";
 
 const tableOptions = [
   "A卓", "C卓", "D卓", "F卓", "1卓", "5卓", "7卓", "9卓", "11卓", "15卓",
@@ -297,6 +298,15 @@ function defaultExitTime(table) {
   return nearestExitTime(table.entryTime);
 }
 
+function defaultAccountingExitTime(table) {
+  if (!table.call && !table.exitTime) return autoExtensionExitTime;
+  return table.exitTime || defaultExitTime(table);
+}
+
+function isAutoExtensionExitTime(exitTime) {
+  return exitTime === autoExtensionExitTime;
+}
+
 function isClosed(table) {
   return table.status === "closed";
 }
@@ -346,12 +356,15 @@ function minutesToTime(totalMinutes) {
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
-function exitTimeOptions(entryTime, selectedTime) {
+function exitTimeOptions(entryTime, selectedTime, includeAutoExtension = false) {
   const start = timeToMinutes(entryTime) ?? timeToMinutes("20:00");
   const selected = timeToMinutes(selectedTime);
   const options = [];
   for (let offset = 60; offset <= 8 * 60; offset += 30) {
     options.push(minutesToTime(start + offset));
+  }
+  if (includeAutoExtension) {
+    options.unshift(autoExtensionExitTime);
   }
   if (selected !== null && !options.includes(selectedTime)) {
     options.unshift(selectedTime);
@@ -415,7 +428,7 @@ function renderTables() {
                 <button class="mini-button extension-button" type="button" data-extend-table="${table.id}" data-extend-minutes="60">60分</button>
                 <button class="mini-button extension-cancel-button" type="button" data-cancel-extension-table="${table.id}" ${Number(table.extensionMinutes || 0) <= 0 ? "disabled" : ""}>延長取消</button>
               </div>
-            ` : ""}
+            ` : `<div class="extension-time-display auto-extension-display"><span>退店時間</span><strong>自動延長</strong></div>`}
           </div>
         ` : ""}
         <p>${table.customer}</p>
@@ -705,7 +718,7 @@ function openAccountingDialog(tableId) {
       <label>対象卓</label>
       <div class="readonly-box">${table.entryTime ? `${table.entryTime} 入店 / ` : ""}${table.customer} / ${table.guests}名 / 指名 ${castDisplay(table)}</div>
     </div>
-    ${selectField("exitTime", "退店時間", exitTimeOptions(table.entryTime, table.exitTime || defaultExitTime(table)))}
+    ${selectField("exitTime", "退店時間", exitTimeOptions(table.entryTime, defaultAccountingExitTime(table), !table.call))}
     ${inStoreNominationField(table)}
     ${bottleField(table)}
     ${field("accountingAmount", "会計金額", "number", "0")}
@@ -713,7 +726,7 @@ function openAccountingDialog(tableId) {
   `;
 
   document.querySelector("#entryForm").reset();
-  const exitTime = table.exitTime || defaultExitTime(table);
+  const exitTime = defaultAccountingExitTime(table);
   document.querySelector("#exitTime").value = exitTime;
   document.querySelector("#accountingAmount").value = totalSale(table);
   syncPaymentAmount();
@@ -1093,7 +1106,7 @@ document.body.addEventListener("click", (event) => {
     table.status = table.status === "closed" ? "open" : "closed";
     if (table.status === "open") {
       table.exitTime = "";
-    } else if (!table.exitTime) {
+    } else if (!table.exitTime || isAutoExtensionExitTime(table.exitTime)) {
       table.exitTime = currentTimeValue();
     }
     saveState();
