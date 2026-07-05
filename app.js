@@ -307,6 +307,11 @@ function isAutoExtensionExitTime(exitTime) {
   return exitTime === autoExtensionExitTime;
 }
 
+function normalTableExitDisplay(table) {
+  if (table.exitTime && !isAutoExtensionExitTime(table.exitTime)) return table.exitTime;
+  return "自動延長";
+}
+
 function isClosed(table) {
   return table.status === "closed";
 }
@@ -428,7 +433,7 @@ function renderTables() {
                 <button class="mini-button extension-button" type="button" data-extend-table="${table.id}" data-extend-minutes="60">60分</button>
                 <button class="mini-button extension-cancel-button" type="button" data-cancel-extension-table="${table.id}" ${Number(table.extensionMinutes || 0) <= 0 ? "disabled" : ""}>延長取消</button>
               </div>
-            ` : `<div class="extension-time-display auto-extension-display"><span>退店時間</span><strong>自動延長</strong></div>`}
+            ` : `<div class="extension-time-display auto-extension-display"><span>退店時間</span><strong>${normalTableExitDisplay(table)}</strong></div>`}
           </div>
         ` : ""}
         <p>${table.customer}</p>
