@@ -38,6 +38,7 @@ let deletingTableId = null;
 let editingTableId = null;
 let editingCastId = null;
 const autoExtensionExitTime = "自動延長中";
+const businessDayRolloverMinutes = 8 * 60;
 
 const tableOptions = [
   "A卓", "C卓", "D卓", "F卓", "1卓", "5卓", "7卓", "9卓", "11卓", "15卓",
@@ -264,12 +265,9 @@ function callWarningTime(table) {
 }
 
 function minutesUntil(time) {
-  const target = timeToMinutes(time);
+  const target = businessDayMinutes(time);
   if (target === null) return false;
-  const now = currentMinutes();
-  const adjustedTarget = target < now - 12 * 60 ? target + 24 * 60 : target;
-  const adjustedNow = now > adjustedTarget ? now - 24 * 60 : now;
-  return adjustedTarget - adjustedNow;
+  return target - currentMinutes();
 }
 
 function extensionWarningActive(table) {
@@ -359,6 +357,12 @@ function minutesToTime(totalMinutes) {
   const hours = Math.floor(normalized / 60);
   const minutes = normalized % 60;
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+function businessDayMinutes(time) {
+  const minutes = typeof time === "number" ? time : timeToMinutes(time);
+  if (minutes === null || Number.isNaN(minutes)) return null;
+  return minutes < businessDayRolloverMinutes ? minutes + 24 * 60 : minutes;
 }
 
 function exitTimeOptions(entryTime, selectedTime, includeAutoExtension = false) {
@@ -936,13 +940,13 @@ function currentTimeValue() {
 
 function currentMinutes() {
   const now = new Date();
-  return now.getHours() * 60 + now.getMinutes();
+  return businessDayMinutes(now.getHours() * 60 + now.getMinutes());
 }
 
 function nearestExitTime(entryTime) {
   const options = exitTimeOptions(entryTime);
-  const now = timeToMinutes(currentTimeValue());
-  const option = options.find((time) => timeToMinutes(time) >= now);
+  const now = currentMinutes();
+  const option = options.find((time) => businessDayMinutes(time) >= now);
   return option || options[0];
 }
 
