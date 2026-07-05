@@ -1015,7 +1015,7 @@ function handleSubmit(event) {
       cardName: String(method).startsWith("カード") ? String(paymentDetails[index] || "").trim() : "",
       responsible: method === "売掛" ? String(paymentDetails[index] || "").trim() : ""
     })).filter((payment) => payment.method || payment.amount > 0);
-    table.exitTime = values.exitTime;
+    table.exitTime = event.currentTarget.querySelector("#exitTime")?.value || values.exitTime;
     table.accountingAmount = Number(values.accountingAmount);
     table.inStoreNominations = inStore;
     table.bottleEntries = bottles;
