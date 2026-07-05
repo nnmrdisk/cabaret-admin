@@ -1218,7 +1218,6 @@ document.querySelector("#sidebarToggle").addEventListener("click", () => {
 document.querySelector("#openSaleButton").addEventListener("click", () => openDialog("sale"));
 document.querySelector("#openSaleButtonSecondary").addEventListener("click", () => openDialog("sale"));
 document.querySelector("#openCastButton").addEventListener("click", () => openDialog("cast"));
-document.querySelector("#addCastButton").addEventListener("click", () => openDialog("cast"));
 document.querySelector("#openCustomerButton").addEventListener("click", () => openDialog("customer"));
 document.querySelector("#closeDialog").addEventListener("click", () => document.querySelector("#entryDialog").close());
 document.querySelector("#cancelDialog").addEventListener("click", () => document.querySelector("#entryDialog").close());
