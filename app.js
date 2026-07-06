@@ -83,6 +83,14 @@ function timeRangeOptions(center, before = 180, after = 360) {
   return options;
 }
 
+function fiveMinuteTimeOptions() {
+  const options = [];
+  for (let minutes = 0; minutes < 24 * 60; minutes += 5) {
+    options.push(minutesToTime(minutes));
+  }
+  return options;
+}
+
 function loadState() {
   const saved = localStorage.getItem(storageKey);
   if (!saved) return structuredClone(seedData);
@@ -765,11 +773,14 @@ function field(name, label, type, placeholder, options = {}) {
 }
 
 function entryTimeField(value = "", isCall = false) {
+  const selectedValue = value || currentTimeValue();
   return `
     <div class="field entry-call-field">
       <label for="entryTime">入店時間</label>
       <div class="entry-call-row">
-        <input id="entryTime" name="entryTime" type="time" step="300" value="${value}" required>
+        <select id="entryTime" name="entryTime" required>
+          ${fiveMinuteTimeOptions().map((time) => `<option value="${time}" ${time === selectedValue ? "selected" : ""}>${time}</option>`).join("")}
+        </select>
         <label class="call-check">
           <input name="call" type="checkbox" value="1" ${isCall ? "checked" : ""}>
           <span>コール</span>
@@ -943,8 +954,8 @@ function syncPaymentAmount() {
 
 function currentTimeValue() {
   const now = new Date();
-  now.setMinutes(Math.round(now.getMinutes() / 5) * 5, 0, 0);
-  return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+  const roundedMinutes = Math.round((now.getHours() * 60 + now.getMinutes()) / 5) * 5;
+  return minutesToTime(roundedMinutes);
 }
 
 function currentMinutes() {
