@@ -510,13 +510,16 @@ function renderTodayCasts() {
       </div>
     </div>
   `});
-  const dailyRows = dailyCasts().map((cast) => `
+  const dailyRows = dailyCasts().map((cast) => {
+    const stats = castStats(cast.name);
+    return `
     <div class="cast-row daily-cast-row">
       <div class="profile">
         <span class="avatar">${initials(cast.name)}</span>
         <div>
           <strong>${cast.name}</strong>
           <span>${cast.role} / ${yen.format(cast.hourly || 0)}</span>
+          <span>指名 ${stats.nominations}本 / 場内 ${stats.inStore}本</span>
         </div>
       </div>
       <div class="shift-controls">
@@ -526,7 +529,7 @@ function renderTodayCasts() {
         <button class="mini-button danger-button" type="button" data-delete-daily-cast="${cast.id}">削除</button>
       </div>
     </div>
-  `);
+  `});
   list.innerHTML = [...castRows, ...dailyRows].join("") || `<p class="empty-note">本日の出勤キャストは未選択です。</p>`;
 }
 
