@@ -19,9 +19,13 @@
       </div>
 
       <nav class="nav-list">
-        <button class="nav-item active" type="button" data-view="dashboard" aria-label="本日">
+        <button class="nav-item active" type="button" data-view="dashboard" aria-label="店舗状況">
           <span aria-hidden="true">⌂</span>
-          <span>本日</span>
+          <span>店舗状況</span>
+        </button>
+        <button class="nav-item" type="button" data-view="attendance" aria-label="本日の出勤">
+          <span aria-hidden="true">◷</span>
+          <span>本日の出勤</span>
         </button>
         <button class="nav-item" type="button" data-view="casts" aria-label="キャスト">
           <span aria-hidden="true">◇</span>
@@ -55,7 +59,7 @@
         <div>
           <p class="page-kicker">管理者画面</p>
           <div class="title-line">
-            <h2 id="pageTitle">本日の店舗状況</h2>
+            <h2 id="pageTitle">店舗状況</h2>
             <span id="businessDateLabel"></span>
           </div>
         </div>
@@ -106,16 +110,19 @@
             <div class="table-grid" id="tableGrid"></div>
           </section>
 
-          <section class="panel attendance-panel">
-            <div class="section-heading">
-              <div>
-                <p>Schedule</p>
-                <h3>本日の出勤</h3>
-              </div>
-            </div>
-            <div class="cast-list" id="todayCastList"></div>
-          </section>
         </div>
+      </section>
+
+      <section class="view" id="attendanceView" aria-label="本日の出勤">
+        <section class="panel attendance-panel">
+          <div class="section-heading">
+            <div>
+              <p>Schedule</p>
+              <h3>本日の出勤</h3>
+            </div>
+          </div>
+          <div class="cast-list" id="todayCastList"></div>
+        </section>
       </section>
 
       <section class="view" id="castsView" aria-label="キャスト管理">
@@ -209,6 +216,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="cloud-config.js?v=20260705-3"></script>
-  <script src="app.js?v=20260705-37"></script>
+  <script src="app.js?v=20260706-1"></script>
 </body>
 </html>

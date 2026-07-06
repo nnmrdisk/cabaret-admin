@@ -52,8 +52,16 @@ function tableSelectOptions(currentTable) {
   return tableOptions;
 }
 
+function castRoleOptionsFor(currentRole) {
+  if (currentRole && !castRoleOptions.includes(currentRole)) {
+    return [currentRole, ...castRoleOptions];
+  }
+  return castRoleOptions;
+}
+
 const viewTitles = {
-  dashboard: "本日の店舗状況",
+  dashboard: "店舗状況",
+  attendance: "本日の出勤",
   casts: "キャスト管理",
   customers: "顧客管理",
   sales: "会計管理",
@@ -64,6 +72,7 @@ const yen = new Intl.NumberFormat("ja-JP", { style: "currency", currency: "JPY",
 
 const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
 const attendanceStatuses = ["出勤", "当欠", "無欠", "出欠"];
+const castRoleOptions = ["ママ", "チーママ", "マネージャー", "キャスト"];
 
 function timeRangeOptions(center, before = 180, after = 360) {
   const base = timeToMinutes(center);
@@ -555,7 +564,7 @@ function renderPayroll() {
   const casts = state.casts.filter((cast) => showInactive || cast.status !== "退勤");
   document.querySelector("#payrollTable").innerHTML = `
     <div class="data-row header">
-      <span>名前</span><span>勤務</span><span>時給</span><span>バック率</span><span>支給見込</span>
+      <span>名前</span><span>勤務</span><span>時給</span><span>給与システム</span><span>支給見込</span>
     </div>
     ${casts.map((cast) => `
       <div class="data-row">
@@ -603,9 +612,9 @@ function openDialog(mode) {
     title.textContent = "キャスト登録";
     fields.innerHTML = `
       ${field("name", "名前", "text", "例: 花音")}
-      ${field("role", "区分", "text", "レギュラー")}
+      ${selectField("role", "区分", castRoleOptions)}
       ${field("hourly", "時給", "number", "3500")}
-      ${field("back", "バック率（%）", "number", "15")}
+      ${field("back", "給与システム", "number", "15")}
       ${checkboxField("todayWorking", "本日の出勤", true)}
     `;
   } else if (mode === "customer") {
@@ -647,9 +656,9 @@ function openCastEditDialog(castId) {
   document.querySelector("#dialogTitle").textContent = `${cast.name} 編集`;
   document.querySelector("#dialogFields").innerHTML = `
     ${field("name", "名前", "text", "例: 花音", { value: cast.name })}
-    ${field("role", "区分", "text", "レギュラー", { value: cast.role || "" })}
+    ${selectField("role", "区分", castRoleOptionsFor(cast.role))}
     ${field("hourly", "時給", "number", "3500", { value: String(cast.hourly || 0) })}
-    ${field("back", "バック率（%）", "number", "15", { value: String(cast.back || 0) })}
+    ${field("back", "給与システム", "number", "15", { value: String(cast.back || 0) })}
     ${checkboxField("todayWorking", "本日の出勤", isWorkingToday(cast))}
   `;
   document.querySelector("#entryForm").reset();
