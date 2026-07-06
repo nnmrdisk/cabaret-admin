@@ -579,12 +579,6 @@ function clearReportCells(sheet, startRow, endRow) {
   }
 }
 
-function prepareReportSummaryCells(sheet) {
-  if (sheet.getCell("H45").isMerged || sheet.getCell("N45").isMerged) {
-    sheet.unMergeCells("C45:R46");
-  }
-}
-
 function styleReportSummaryCells(sheet) {
   ["C45", "H45", "N45"].forEach((address) => {
     const cell = sheet.getCell(address);
@@ -624,7 +618,7 @@ async function exportTodaySalesReport() {
       throw new Error("Excelテンプレートを取得する機能がこのブラウザで利用できません。");
     }
 
-    const response = await fetchFile("data/list/list_cast.xlsx?v=20260706-11");
+    const response = await fetchFile("data/list/list_cast.xlsx?v=20260706-12");
     if (!response.ok) {
       throw new Error("list_cast.xlsx テンプレートを読み込めませんでした。");
     }
@@ -638,8 +632,6 @@ async function exportTodaySalesReport() {
     const reportCasts = casts.slice(0, endRow - startRow + 1);
 
     clearReportCells(sheet, startRow, endRow);
-    prepareReportSummaryCells(sheet);
-
     reportCasts.forEach((cast, index) => {
       const row = startRow + index;
       const stats = castStats(cast.name);
