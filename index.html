@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>店舗管理ダッシュボード</title>
-  <link rel="stylesheet" href="styles.css?v=20260706-9">
+  <link rel="stylesheet" href="styles.css?v=20260706-13">
 </head>
 <body>
   <div class="app-shell">
@@ -108,6 +108,9 @@
               </div>
             </div>
             <div class="table-grid" id="tableGrid"></div>
+            <div class="report-actions">
+              <button class="primary-button" type="button" id="exportSellListButton">売上リストの作成</button>
+            </div>
           </section>
 
         </div>
@@ -224,6 +227,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="vendor/exceljs.min.js?v=20260706-9"></script>
   <script src="cloud-config.js?v=20260705-3"></script>
-  <script src="app.js?v=20260706-12"></script>
+  <script src="app.js?v=20260706-13"></script>
 </body>
 </html>

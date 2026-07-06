@@ -612,7 +612,8 @@ button {
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
 }
 
-.attendance-report-actions {
+.attendance-report-actions,
+.report-actions {
   display: flex;
   justify-content: flex-end;
   margin-top: 16px;

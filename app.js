@@ -570,8 +570,64 @@ function reportSalesLabel(amount) {
   return `¥${Number(amount || 0).toLocaleString("ja-JP")}`;
 }
 
+function reportAmountLabel(amount) {
+  return Number(amount || 0).toLocaleString("ja-JP");
+}
+
+function sellListTableLabel(tableName) {
+  return String(tableName || "").replace(/卓$/, "").trim();
+}
+
+function sellListExitTime(table) {
+  if (!table.exitTime || isAutoExtensionExitTime(table.exitTime)) return "";
+  return table.exitTime;
+}
+
+function reportTextFontSize(value, baseSize = 10) {
+  const length = String(value || "").length;
+  if (length > 42) return 6;
+  if (length > 30) return 7;
+  if (length > 20) return 8;
+  if (length > 12) return 9;
+  return baseSize;
+}
+
+function setReportCell(sheet, address, value, options = {}) {
+  const cell = sheet.getCell(address);
+  const style = {
+    ...(cell.style || {}),
+    font: { ...(cell.font || {}), size: options.fontSize || reportTextFontSize(value), bold: options.bold ?? cell.font?.bold },
+    alignment: {
+      ...(cell.alignment || {}),
+      horizontal: options.horizontal || "center",
+      vertical: "middle",
+      wrapText: options.wrapText ?? true
+    }
+  };
+  cell.value = value;
+  cell.style = style;
+
+  const merge = cell.isMerged ? sheet._merges?.[cell.master.address]?.model : null;
+  if (merge) {
+    for (let row = merge.top; row <= merge.bottom; row += 1) {
+      for (let column = merge.left; column <= merge.right; column += 1) {
+        sheet.getRow(row).getCell(column).style = style;
+      }
+    }
+  }
+}
+
 function clearReportCells(sheet, startRow, endRow) {
   const columns = ["D", "G", "I", "K", "M", "O", "Q"];
+  for (let row = startRow; row <= endRow; row += 1) {
+    columns.forEach((column) => {
+      sheet.getCell(`${column}${row}`).value = null;
+    });
+  }
+}
+
+function clearSellListCells(sheet, startRow, endRow) {
+  const columns = ["B", "C", "D", "I", "K", "M", "Q", "U", "Z"];
   for (let row = startRow; row <= endRow; row += 1) {
     columns.forEach((column) => {
       sheet.getCell(`${column}${row}`).value = null;
@@ -659,6 +715,69 @@ async function exportTodaySalesReport() {
     window.alert(`${filename} を作成しました。印刷する場合は、ダウンロードされたExcelファイルを開いて印刷してください。`);
   } catch (error) {
     window.alert(error.message || "本日の売上結果ファイルの作成に失敗しました。");
+  } finally {
+    button.disabled = false;
+    button.textContent = originalText;
+  }
+}
+
+async function exportSellListReport() {
+  const button = document.querySelector("#exportSellListButton");
+  const originalText = button.textContent;
+  button.disabled = true;
+  button.textContent = "作成中...";
+
+  try {
+    const ExcelWorkbook = globalThis.ExcelJS?.Workbook || globalThis.window?.ExcelJS?.Workbook;
+    if (!ExcelWorkbook) {
+      throw new Error("Excel作成ライブラリを読み込めませんでした。通信環境を確認してください。");
+    }
+
+    const fetchFile = globalThis.fetch || globalThis.window?.fetch;
+    if (!fetchFile) {
+      throw new Error("Excelテンプレートを取得する機能がこのブラウザで利用できません。");
+    }
+
+    const response = await fetchFile("data/list/list_sell.xlsx?v=20260706-13");
+    if (!response.ok) {
+      throw new Error("list_sell.xlsx テンプレートを読み込めませんでした。");
+    }
+
+    const workbook = new ExcelWorkbook();
+    await workbook.xlsx.load(await response.arrayBuffer());
+    const sheet = workbook.worksheets[0];
+    const startRow = 4;
+    const tables = [...state.tables].sort((a, b) => Number(a.id || 0) - Number(b.id || 0));
+    const endRow = Math.max(sheet.rowCount, startRow + tables.length - 1);
+    let cumulativeGuests = 0;
+
+    clearSellListCells(sheet, startRow, endRow);
+
+    tables.forEach((table, index) => {
+      const row = startRow + index;
+      const guests = Number(table.guests || 0);
+      cumulativeGuests += guests;
+      const nominations = castDisplay(table);
+      const inStore = inStoreNominationDisplay(table);
+      const bottles = bottleDisplay(table);
+
+      setReportCell(sheet, `B${row}`, sellListTableLabel(table.table));
+      setReportCell(sheet, `C${row}`, guests);
+      setReportCell(sheet, `D${row}`, cumulativeGuests);
+      setReportCell(sheet, `I${row}`, table.entryTime || "");
+      setReportCell(sheet, `K${row}`, sellListExitTime(table));
+      setReportCell(sheet, `M${row}`, nominations === "未設定" ? "" : nominations, { fontSize: reportTextFontSize(nominations, 10) });
+      setReportCell(sheet, `Q${row}`, inStore === "なし" ? "" : inStore, { fontSize: reportTextFontSize(inStore, 10) });
+      setReportCell(sheet, `U${row}`, bottles === "なし" ? "" : bottles, { fontSize: reportTextFontSize(bottles, 10) });
+      setReportCell(sheet, `Z${row}`, reportAmountLabel(totalSale(table)), { horizontal: "left", wrapText: false, fontSize: 10 });
+    });
+
+    const filename = `${businessDateStamp()}list_sell.xlsx`;
+    const buffer = await workbook.xlsx.writeBuffer();
+    downloadBlob(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), filename);
+    window.alert(`${filename} を作成しました。`);
+  } catch (error) {
+    window.alert(error.message || "売上リストの作成に失敗しました。");
   } finally {
     button.disabled = false;
     button.textContent = originalText;
@@ -1458,6 +1577,7 @@ document.querySelector("#openSaleButtonSecondary").addEventListener("click", () 
 document.querySelector("#openCastButton").addEventListener("click", () => openDialog("cast"));
 document.querySelector("#openDailyCastButton").addEventListener("click", () => openDialog("dailyCast"));
 document.querySelector("#printTodaySalesButton").addEventListener("click", exportTodaySalesReport);
+document.querySelector("#exportSellListButton").addEventListener("click", exportSellListReport);
 document.querySelector("#openCustomerButton").addEventListener("click", () => openDialog("customer"));
 document.querySelector("#closeDialog").addEventListener("click", () => document.querySelector("#entryDialog").close());
 document.querySelector("#cancelDialog").addEventListener("click", () => document.querySelector("#entryDialog").close());
