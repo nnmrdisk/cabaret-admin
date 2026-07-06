@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>店舗管理ダッシュボード</title>
-  <link rel="stylesheet" href="styles.css?v=20260706-8">
+  <link rel="stylesheet" href="styles.css?v=20260706-9">
 </head>
 <body>
   <div class="app-shell">
@@ -126,6 +126,9 @@
             </button>
           </div>
           <div class="cast-list" id="todayCastList"></div>
+          <div class="attendance-report-actions">
+            <button class="primary-button" type="button" id="printTodaySalesButton">本日の売上結果の印刷</button>
+          </div>
         </section>
       </section>
 
@@ -219,7 +222,8 @@
   </dialog>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="vendor/exceljs.min.js?v=20260706-9"></script>
   <script src="cloud-config.js?v=20260705-3"></script>
-  <script src="app.js?v=20260706-7"></script>
+  <script src="app.js?v=20260706-9"></script>
 </body>
 </html>

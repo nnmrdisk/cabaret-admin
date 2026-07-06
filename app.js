@@ -382,6 +382,14 @@ function businessDateLabel() {
   return `${month}/${date}（${weekdays[now.getDay()]}）`;
 }
 
+function businessDateStamp() {
+  const now = new Date();
+  if (now.getHours() < 8) {
+    now.setDate(now.getDate() - 1);
+  }
+  return `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+}
+
 function timeToMinutes(time) {
   if (!time) return null;
   const [hours, minutes] = time.split(":").map(Number);
@@ -400,6 +408,14 @@ function businessDayMinutes(time) {
   const minutes = typeof time === "number" ? time : timeToMinutes(time);
   if (minutes === null || Number.isNaN(minutes)) return null;
   return minutes < businessDayRolloverMinutes ? minutes + 24 * 60 : minutes;
+}
+
+function shiftDurationLabel(startTime, endTime) {
+  const start = businessDayMinutes(startTime);
+  let end = businessDayMinutes(endTime);
+  if (start === null || end === null) return "";
+  if (end < start) end += 24 * 60;
+  return `${((end - start) / 60).toFixed(1)}H`;
 }
 
 function exitTimeOptions(entryTime, selectedTime, includeAutoExtension = false) {
@@ -536,6 +552,87 @@ function renderTodayCasts() {
     </div>
   `});
   list.innerHTML = [...castRows, ...dailyRows].join("") || `<p class="empty-note">本日の出勤キャストは未選択です。</p>`;
+}
+
+function todayAttendanceCasts() {
+  return [...state.casts.filter(isWorkingToday), ...dailyCasts()];
+}
+
+function clearReportCells(sheet, startRow, count) {
+  const columns = ["D", "G", "I", "K", "M", "O", "Q"];
+  for (let row = startRow; row < startRow + count; row += 1) {
+    columns.forEach((column) => {
+      sheet.getCell(`${column}${row}`).value = null;
+    });
+  }
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function exportTodaySalesReport() {
+  const button = document.querySelector("#printTodaySalesButton");
+  const originalText = button.textContent;
+  button.disabled = true;
+  button.textContent = "作成中...";
+
+  try {
+    const ExcelWorkbook = globalThis.ExcelJS?.Workbook || globalThis.window?.ExcelJS?.Workbook;
+    if (!ExcelWorkbook) {
+      throw new Error("Excel作成ライブラリを読み込めませんでした。通信環境を確認してください。");
+    }
+
+    const fetchFile = globalThis.fetch || globalThis.window?.fetch;
+    if (!fetchFile) {
+      throw new Error("Excelテンプレートを取得する機能がこのブラウザで利用できません。");
+    }
+
+    const response = await fetchFile("data/list/list_cast.xlsx?v=20260706-9");
+    if (!response.ok) {
+      throw new Error("list_cast.xlsx テンプレートを読み込めませんでした。");
+    }
+
+    const workbook = new ExcelWorkbook();
+    await workbook.xlsx.load(await response.arrayBuffer());
+    const sheet = workbook.worksheets[0];
+    const casts = todayAttendanceCasts();
+    const startRow = 4;
+
+    clearReportCells(sheet, startRow, Math.max(casts.length + 10, 60));
+
+    casts.forEach((cast, index) => {
+      const row = startRow + index;
+      const stats = castStats(cast.name);
+      const shiftStart = cast.shiftStart || "20:00";
+      const shiftEnd = cast.shiftEnd || "23:30";
+
+      sheet.getCell(`D${row}`).value = cast.name;
+      sheet.getCell(`G${row}`).value = shiftStart;
+      sheet.getCell(`I${row}`).value = shiftEnd;
+      sheet.getCell(`K${row}`).value = shiftDurationLabel(shiftStart, shiftEnd);
+      sheet.getCell(`M${row}`).value = stats.companion;
+      sheet.getCell(`O${row}`).value = stats.nominations;
+      sheet.getCell(`Q${row}`).value = stats.inStore;
+    });
+
+    const filename = `${businessDateStamp()}list_cast.xlsx`;
+    const buffer = await workbook.xlsx.writeBuffer();
+    downloadBlob(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), filename);
+    window.alert(`${filename} を作成しました。印刷する場合は、ダウンロードされたExcelファイルを開いて印刷してください。`);
+  } catch (error) {
+    window.alert(error.message || "本日の売上結果ファイルの作成に失敗しました。");
+  } finally {
+    button.disabled = false;
+    button.textContent = originalText;
+  }
 }
 
 function renderCastTable() {
@@ -1330,6 +1427,7 @@ document.querySelector("#openSaleButton").addEventListener("click", () => openDi
 document.querySelector("#openSaleButtonSecondary").addEventListener("click", () => openDialog("sale"));
 document.querySelector("#openCastButton").addEventListener("click", () => openDialog("cast"));
 document.querySelector("#openDailyCastButton").addEventListener("click", () => openDialog("dailyCast"));
+document.querySelector("#printTodaySalesButton").addEventListener("click", exportTodaySalesReport);
 document.querySelector("#openCustomerButton").addEventListener("click", () => openDialog("customer"));
 document.querySelector("#closeDialog").addEventListener("click", () => document.querySelector("#entryDialog").close());
 document.querySelector("#cancelDialog").addEventListener("click", () => document.querySelector("#entryDialog").close());
