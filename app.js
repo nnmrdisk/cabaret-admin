@@ -355,6 +355,10 @@ function activeTables() {
   return state.tables.filter((table) => !isClosed(table));
 }
 
+function businessDayTables() {
+  return Array.isArray(state.tables) ? state.tables : [];
+}
+
 function isWorkingToday(cast) {
   if (cast.todayWorking !== undefined) return Boolean(cast.todayWorking);
   return cast.status !== "退勤";
@@ -365,10 +369,10 @@ function castAttendanceStatus(cast) {
 }
 
 function castStats(name) {
-  const openTables = activeTables();
-  const companion = openTables.reduce((sum, table) => sum + (companionCasts(table).includes(name) ? 1 : 0), 0);
-  const nominations = openTables.reduce((sum, table) => sum + (nominatedCasts(table).includes(name) ? 1 : 0), 0);
-  const inStore = openTables.reduce((sum, table) => sum + (inStoreNominations(table).includes(name) ? 1 : 0), 0);
+  const tables = businessDayTables();
+  const companion = tables.reduce((sum, table) => sum + (companionCasts(table).includes(name) ? 1 : 0), 0);
+  const nominations = tables.reduce((sum, table) => sum + (nominatedCasts(table).includes(name) ? 1 : 0), 0);
+  const inStore = tables.reduce((sum, table) => sum + (inStoreNominations(table).includes(name) ? 1 : 0), 0);
   return { companion, nominations, inStore };
 }
 
@@ -455,9 +459,9 @@ function renderMetrics() {
   const guestCount = state.tables.reduce((sum, table) => sum + Number(table.guests || 0), 0);
   const activeGroupCount = activeTables().length;
   const activeGuestCount = activeTables().reduce((sum, table) => sum + Number(table.guests || 0), 0);
-  const companionCount = activeTables().reduce((sum, table) => sum + companionCasts(table).length, 0);
-  const nominationCount = activeTables().reduce((sum, table) => sum + nominatedCasts(table).length, 0);
-  const inStoreCount = activeTables().reduce((sum, table) => sum + inStoreNominations(table).length, 0);
+  const companionCount = businessDayTables().reduce((sum, table) => sum + companionCasts(table).length, 0);
+  const nominationCount = businessDayTables().reduce((sum, table) => sum + nominatedCasts(table).length, 0);
+  const inStoreCount = businessDayTables().reduce((sum, table) => sum + inStoreNominations(table).length, 0);
 
   document.querySelector("#todayGroupsGuests").textContent = `${groupCount}組 / ${guestCount}名`;
   document.querySelector("#activeGroupsGuests").textContent = `店内 ${activeGroupCount}組 / ${activeGuestCount}名`;
@@ -1419,6 +1423,30 @@ function handleSubmit(event) {
   document.querySelector("#entryDialog").close();
 }
 
+function endBusinessDay() {
+  const confirmed = window.confirm(
+    "営業終了しますか？\n\n本日の来店履歴、当日追加キャスト、出勤情報をクリアし、キャスト管理の出勤チェックをすべて外します。"
+  );
+  if (!confirmed) return;
+
+  state.tables = [];
+  state.dailyCasts = [];
+  state.casts = state.casts.map((cast) => ({
+    ...cast,
+    status: "退勤",
+    todayWorking: false,
+    shiftStart: "20:00",
+    shiftEnd: "23:30",
+    attendanceStatus: "出勤"
+  }));
+  tableFilter = "open";
+  document.querySelectorAll(".segment").forEach((segment) => {
+    segment.classList.toggle("active", segment.dataset.filter === "open");
+  });
+  saveState();
+  render();
+}
+
 document.querySelectorAll(".nav-item").forEach((button) => {
   button.addEventListener("click", () => switchView(button.dataset.view));
 });
@@ -1594,6 +1622,7 @@ document.querySelector("#openDailyCastButton").addEventListener("click", () => o
 document.querySelector("#printTodaySalesButton").addEventListener("click", exportTodaySalesReport);
 document.querySelector("#exportSellListButton").addEventListener("click", exportSellListReport);
 document.querySelector("#openCustomerButton").addEventListener("click", () => openDialog("customer"));
+document.querySelector("#endBusinessDayButton").addEventListener("click", endBusinessDay);
 document.querySelector("#closeDialog").addEventListener("click", () => document.querySelector("#entryDialog").close());
 document.querySelector("#cancelDialog").addEventListener("click", () => document.querySelector("#entryDialog").close());
 document.querySelector("#entryForm").addEventListener("submit", handleSubmit);
