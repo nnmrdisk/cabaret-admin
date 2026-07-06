@@ -616,10 +616,13 @@ button {
   padding: 11px;
   border: 1px solid var(--line);
   border-radius: 8px;
+  align-items: flex-start;
+  flex-wrap: wrap;
 }
 
 .shift-controls {
   display: flex;
+  flex: 1 1 260px;
   gap: 6px;
   flex-wrap: wrap;
   justify-content: flex-end;
@@ -647,7 +650,12 @@ button {
 .profile {
   display: flex;
   align-items: center;
+  flex: 1 1 220px;
   gap: 10px;
+  min-width: 0;
+}
+
+.cast-row .profile > div {
   min-width: 0;
 }
 
@@ -674,6 +682,13 @@ button {
 .profile span {
   color: var(--muted);
   font-size: 12px;
+}
+
+.cast-row .profile span {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  line-height: 1.45;
 }
 
 .data-table {
