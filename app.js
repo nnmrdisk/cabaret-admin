@@ -204,7 +204,13 @@ function castPay(cast) {
 }
 
 function activeCasts() {
-  return state.casts.filter(isWorkingToday);
+  const casts = [...state.casts.filter(isWorkingToday), ...dailyCasts()];
+  const seen = new Set();
+  return casts.filter((cast) => {
+    if (!cast.name || seen.has(cast.name)) return false;
+    seen.add(cast.name);
+    return true;
+  });
 }
 
 function dailyCasts() {
