@@ -596,7 +596,12 @@ function setReportCell(sheet, address, value, options = {}) {
   const cell = sheet.getCell(address);
   const style = {
     ...(cell.style || {}),
-    font: { ...(cell.font || {}), size: options.fontSize || reportTextFontSize(value), bold: options.bold ?? cell.font?.bold },
+    font: {
+      ...(cell.font || {}),
+      size: options.fontSize || reportTextFontSize(value),
+      bold: options.bold ?? cell.font?.bold,
+      color: options.color || cell.font?.color
+    },
     alignment: {
       ...(cell.alignment || {}),
       horizontal: options.horizontal || "center",
@@ -627,12 +632,17 @@ function clearReportCells(sheet, startRow, endRow) {
 }
 
 function clearSellListCells(sheet, startRow, endRow) {
-  const columns = ["B", "C", "D", "I", "K", "M", "Q", "U", "Z"];
+  const columns = ["B", "C", "D", "E", "I", "K", "M", "Q", "U", "Z"];
   for (let row = startRow; row <= endRow; row += 1) {
     columns.forEach((column) => {
       sheet.getCell(`${column}${row}`).value = null;
     });
   }
+}
+
+function bottleNameDisplay(table) {
+  const bottles = bottleEntries(table).filter((bottle) => bottle.name || Number(bottle.amount));
+  return bottles.length ? bottles.map((bottle) => bottle.name || "ボトル").join("、") : "なし";
 }
 
 function styleReportSummaryCells(sheet) {
@@ -738,7 +748,7 @@ async function exportSellListReport() {
       throw new Error("Excelテンプレートを取得する機能がこのブラウザで利用できません。");
     }
 
-    const response = await fetchFile("data/list/list_sell.xlsx?v=20260706-13");
+    const response = await fetchFile("data/list/list_sell.xlsx?v=20260707-1");
     if (!response.ok) {
       throw new Error("list_sell.xlsx テンプレートを読み込めませんでした。");
     }
@@ -758,18 +768,23 @@ async function exportSellListReport() {
       const guests = Number(table.guests || 0);
       cumulativeGuests += guests;
       const nominations = castDisplay(table);
+      const isFreeNomination = tableCasts(table).includes("フリー");
       const inStore = inStoreNominationDisplay(table);
-      const bottles = bottleDisplay(table);
+      const bottles = bottleNameDisplay(table);
 
       setReportCell(sheet, `B${row}`, sellListTableLabel(table.table));
       setReportCell(sheet, `C${row}`, guests);
       setReportCell(sheet, `D${row}`, cumulativeGuests);
+      setReportCell(sheet, `E${row}`, table.customer || "", { fontSize: reportTextFontSize(table.customer || "", 10) });
       setReportCell(sheet, `I${row}`, table.entryTime || "");
       setReportCell(sheet, `K${row}`, sellListExitTime(table));
-      setReportCell(sheet, `M${row}`, nominations === "未設定" ? "" : nominations, { fontSize: reportTextFontSize(nominations, 10) });
+      setReportCell(sheet, `M${row}`, nominations === "未設定" ? "" : nominations, {
+        fontSize: reportTextFontSize(nominations, 10),
+        color: isFreeNomination ? { argb: "FFFF0000" } : undefined
+      });
       setReportCell(sheet, `Q${row}`, inStore === "なし" ? "" : inStore, { fontSize: reportTextFontSize(inStore, 10) });
       setReportCell(sheet, `U${row}`, bottles === "なし" ? "" : bottles, { fontSize: reportTextFontSize(bottles, 10) });
-      setReportCell(sheet, `Z${row}`, reportAmountLabel(totalSale(table)), { horizontal: "left", wrapText: false, fontSize: 10 });
+      setReportCell(sheet, `Z${row}`, reportAmountLabel(totalSale(table)), { horizontal: "right", wrapText: false, fontSize: 10, bold: true });
     });
 
     const filename = `${businessDateStamp()}list_sell.xlsx`;
