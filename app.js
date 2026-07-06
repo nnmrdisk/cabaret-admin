@@ -566,9 +566,13 @@ function attendanceCountLabel(casts) {
   return `${staffCount}+${managementCount}`;
 }
 
-function clearReportCells(sheet, startRow, count) {
+function reportSalesLabel(amount) {
+  return `¥${Number(amount || 0).toLocaleString("ja-JP")}`;
+}
+
+function clearReportCells(sheet, startRow, endRow) {
   const columns = ["D", "G", "I", "K", "M", "O", "Q"];
-  for (let row = startRow; row < startRow + count; row += 1) {
+  for (let row = startRow; row <= endRow; row += 1) {
     columns.forEach((column) => {
       sheet.getCell(`${column}${row}`).value = null;
     });
@@ -579,6 +583,17 @@ function prepareReportSummaryCells(sheet) {
   if (sheet.getCell("H45").isMerged || sheet.getCell("N45").isMerged) {
     sheet.unMergeCells("C45:R46");
   }
+}
+
+function styleReportSummaryCells(sheet) {
+  ["C45", "H45", "N45"].forEach((address) => {
+    const cell = sheet.getCell(address);
+    cell.font = { ...(cell.font || {}), size: 20, bold: true };
+    cell.alignment = { ...(cell.alignment || {}), horizontal: "center", vertical: "middle" };
+  });
+  const salesCell = sheet.getCell("C48");
+  salesCell.font = { ...(salesCell.font || {}), size: 24, bold: true };
+  salesCell.alignment = { ...(salesCell.alignment || {}), horizontal: "center", vertical: "middle" };
 }
 
 function downloadBlob(blob, filename) {
@@ -609,7 +624,7 @@ async function exportTodaySalesReport() {
       throw new Error("Excelテンプレートを取得する機能がこのブラウザで利用できません。");
     }
 
-    const response = await fetchFile("data/list/list_cast.xlsx?v=20260706-10");
+    const response = await fetchFile("data/list/list_cast.xlsx?v=20260706-11");
     if (!response.ok) {
       throw new Error("list_cast.xlsx テンプレートを読み込めませんでした。");
     }
@@ -619,11 +634,13 @@ async function exportTodaySalesReport() {
     const sheet = workbook.worksheets[0];
     const casts = todayAttendanceCasts();
     const startRow = 4;
+    const endRow = 43;
+    const reportCasts = casts.slice(0, endRow - startRow + 1);
 
-    clearReportCells(sheet, startRow, Math.max(casts.length + 10, 60));
+    clearReportCells(sheet, startRow, endRow);
     prepareReportSummaryCells(sheet);
 
-    casts.forEach((cast, index) => {
+    reportCasts.forEach((cast, index) => {
       const row = startRow + index;
       const stats = castStats(cast.name);
       const shiftStart = cast.shiftStart || "20:00";
@@ -641,7 +658,8 @@ async function exportTodaySalesReport() {
     sheet.getCell("C45").value = state.tables.length;
     sheet.getCell("H45").value = state.tables.reduce((sum, table) => sum + Number(table.guests || 0), 0);
     sheet.getCell("N45").value = attendanceCountLabel(casts);
-    sheet.getCell("C48").value = state.tables.reduce((sum, table) => sum + totalSale(table), 0);
+    sheet.getCell("C48").value = reportSalesLabel(state.tables.reduce((sum, table) => sum + totalSale(table), 0));
+    styleReportSummaryCells(sheet);
 
     const filename = `${businessDateStamp()}list_cast.xlsx`;
     const buffer = await workbook.xlsx.writeBuffer();
