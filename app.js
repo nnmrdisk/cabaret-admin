@@ -231,6 +231,11 @@ function companionCasts(table) {
   return [];
 }
 
+function nominatedCasts(table) {
+  const companions = new Set(companionCasts(table));
+  return tableCasts(table).filter((name) => name && name !== "フリー" && !companions.has(name));
+}
+
 function castDisplay(table) {
   const casts = tableCasts(table);
   const companions = companionCasts(table);
@@ -362,7 +367,7 @@ function castAttendanceStatus(cast) {
 function castStats(name) {
   const openTables = activeTables();
   const companion = openTables.reduce((sum, table) => sum + (companionCasts(table).includes(name) ? 1 : 0), 0);
-  const nominations = openTables.reduce((sum, table) => sum + (tableCasts(table).includes(name) ? 1 : 0), 0);
+  const nominations = openTables.reduce((sum, table) => sum + (nominatedCasts(table).includes(name) ? 1 : 0), 0);
   const inStore = openTables.reduce((sum, table) => sum + (inStoreNominations(table).includes(name) ? 1 : 0), 0);
   return { companion, nominations, inStore };
 }
@@ -435,7 +440,7 @@ function renderMetrics() {
   const activeGroupCount = activeTables().length;
   const activeGuestCount = activeTables().reduce((sum, table) => sum + Number(table.guests || 0), 0);
   const companionCount = activeTables().reduce((sum, table) => sum + companionCasts(table).length, 0);
-  const nominationCount = activeTables().reduce((sum, table) => sum + tableCasts(table).filter((name) => name && name !== "フリー").length, 0);
+  const nominationCount = activeTables().reduce((sum, table) => sum + nominatedCasts(table).length, 0);
   const inStoreCount = activeTables().reduce((sum, table) => sum + inStoreNominations(table).length, 0);
 
   document.querySelector("#todayGroupsGuests").textContent = `${groupCount}組 / ${guestCount}名`;
