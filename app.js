@@ -26,7 +26,8 @@ const seedData = {
     { id: 2, table: "A2", customer: "田中 様", cast: "美咲", status: "open", guests: 1, set: 18000, drinks: 12000, bottles: 0, service: 4000 },
     { id: 3, table: "B1", customer: "高橋 様", cast: "葵", status: "closed", guests: 3, set: 45000, drinks: 22000, bottles: 28000, service: 9000 },
     { id: 4, table: "C1", customer: "フリー", cast: "沙羅", status: "closed", guests: 2, set: 30000, drinks: 9000, bottles: 0, service: 6000 }
-  ]
+  ],
+  dailyCasts: []
 };
 
 let state = loadState();
@@ -73,6 +74,7 @@ const yen = new Intl.NumberFormat("ja-JP", { style: "currency", currency: "JPY",
 const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
 const attendanceStatuses = ["出勤", "当欠", "無欠", "出欠"];
 const castRoleOptions = ["ママ", "チーママ", "マネージャー", "キャスト"];
+const dailyCastRoleOptions = ["体入", "派遣（モア）", "派遣（ジュエルズ）", "ヘルプ（サエラ）", "ヘルプ（花水岐）"];
 
 function timeRangeOptions(center, before = 180, after = 360) {
   const base = timeToMinutes(center);
@@ -203,6 +205,13 @@ function castPay(cast) {
 
 function activeCasts() {
   return state.casts.filter(isWorkingToday);
+}
+
+function dailyCasts() {
+  if (!Array.isArray(state.dailyCasts)) {
+    state.dailyCasts = [];
+  }
+  return state.dailyCasts;
 }
 
 function tableCasts(table) {
@@ -477,7 +486,7 @@ function renderTables() {
 function renderTodayCasts() {
   const list = document.querySelector("#todayCastList");
   const workingCasts = state.casts.filter(isWorkingToday);
-  list.innerHTML = workingCasts.map((cast) => {
+  const castRows = workingCasts.map((cast) => {
     const stats = castStats(cast.name);
     return `
     <div class="cast-row">
@@ -494,7 +503,25 @@ function renderTodayCasts() {
         ${selectInline(`attendanceStatus-${cast.id}`, castAttendanceStatus(cast), attendanceStatuses)}
       </div>
     </div>
-  `}).join("") || `<p class="empty-note">本日の出勤キャストは未選択です。</p>`;
+  `});
+  const dailyRows = dailyCasts().map((cast) => `
+    <div class="cast-row daily-cast-row">
+      <div class="profile">
+        <span class="avatar">${initials(cast.name)}</span>
+        <div>
+          <strong>${cast.name}</strong>
+          <span>${cast.role} / ${yen.format(cast.hourly || 0)}</span>
+        </div>
+      </div>
+      <div class="shift-controls">
+        ${selectInline(`dailyCastShiftStart-${cast.id}`, cast.shiftStart || "20:00", timeRangeOptions("20:00"))}
+        ${selectInline(`dailyCastShiftEnd-${cast.id}`, cast.shiftEnd || "23:30", timeRangeOptions("23:30"))}
+        ${selectInline(`dailyCastAttendanceStatus-${cast.id}`, cast.attendanceStatus || "出勤", attendanceStatuses)}
+        <button class="mini-button danger-button" type="button" data-delete-daily-cast="${cast.id}">削除</button>
+      </div>
+    </div>
+  `);
+  list.innerHTML = [...castRows, ...dailyRows].join("") || `<p class="empty-note">本日の出勤キャストは未選択です。</p>`;
 }
 
 function renderCastTable() {
@@ -624,6 +651,14 @@ function openDialog(mode) {
       ${field("hourly", "時給", "number", "3500")}
       ${field("back", "給与システム", "number", "15")}
       ${checkboxField("todayWorking", "本日の出勤", true)}
+    `;
+  } else if (mode === "dailyCast") {
+    kicker.textContent = "Schedule";
+    title.textContent = "当日キャスト追加";
+    fields.innerHTML = `
+      ${field("name", "キャスト名", "text", "例: 体入キャスト")}
+      ${selectField("role", "区分", dailyCastRoleOptions)}
+      ${field("hourly", "時給", "number", "3500")}
     `;
   } else if (mode === "customer") {
     kicker.textContent = "Customer";
@@ -1060,6 +1095,16 @@ function handleSubmit(event) {
       nominations: 0,
       hours: 5
     });
+  } else if (dialogMode === "dailyCast") {
+    dailyCasts().push({
+      id: Date.now(),
+      name: values.name.trim(),
+      role: values.role,
+      hourly: Number(values.hourly || 0),
+      shiftStart: "20:00",
+      shiftEnd: "23:30",
+      attendanceStatus: "出勤"
+    });
   } else if (dialogMode === "customer") {
     state.customers.push({
       id: Date.now(),
@@ -1121,6 +1166,7 @@ document.body.addEventListener("click", (event) => {
   const editButton = event.target.closest("[data-edit-table]");
   const castEditButton = event.target.closest("[data-edit-cast]");
   const castDeleteButton = event.target.closest("[data-delete-cast]");
+  const dailyCastDeleteButton = event.target.closest("[data-delete-daily-cast]");
   const addNominationButton = event.target.closest("#addNominationButton");
   const removeNominationButton = event.target.closest(".remove-nomination");
   const addInStoreNominationButton = event.target.closest("#addInStoreNominationButton");
@@ -1183,6 +1229,15 @@ document.body.addEventListener("click", (event) => {
       state.casts = state.casts.filter((item) => item.id !== cast.id);
       saveState();
       render();
+    }
+  }
+
+  if (dailyCastDeleteButton) {
+    const cast = dailyCasts().find((item) => item.id === Number(dailyCastDeleteButton.dataset.deleteDailyCast));
+    if (cast && window.confirm(`${cast.name} を本日の出勤から削除しますか？`)) {
+      state.dailyCasts = dailyCasts().filter((item) => item.id !== cast.id);
+      saveState();
+      renderTodayCasts();
     }
   }
 
@@ -1260,6 +1315,7 @@ document.querySelector("#sidebarToggle").addEventListener("click", () => {
 document.querySelector("#openSaleButton").addEventListener("click", () => openDialog("sale"));
 document.querySelector("#openSaleButtonSecondary").addEventListener("click", () => openDialog("sale"));
 document.querySelector("#openCastButton").addEventListener("click", () => openDialog("cast"));
+document.querySelector("#openDailyCastButton").addEventListener("click", () => openDialog("dailyCast"));
 document.querySelector("#openCustomerButton").addEventListener("click", () => openDialog("customer"));
 document.querySelector("#closeDialog").addEventListener("click", () => document.querySelector("#entryDialog").close());
 document.querySelector("#cancelDialog").addEventListener("click", () => document.querySelector("#entryDialog").close());
@@ -1292,6 +1348,15 @@ document.body.addEventListener("change", (event) => {
       cast[field] = inlineSelect.value;
       saveState();
       renderTodayCasts();
+    } else if (field.startsWith("dailyCast")) {
+      const dailyCast = dailyCasts().find((item) => item.id === Number(id));
+      const dailyField = field.replace("dailyCast", "");
+      const targetField = dailyField.charAt(0).toLowerCase() + dailyField.slice(1);
+      if (dailyCast) {
+        dailyCast[targetField] = inlineSelect.value;
+        saveState();
+        renderTodayCasts();
+      }
     }
   }
 
