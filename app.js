@@ -558,12 +558,26 @@ function todayAttendanceCasts() {
   return [...state.casts.filter(isWorkingToday), ...dailyCasts()];
 }
 
+function attendanceCountLabel(casts) {
+  const staffRoles = new Set(["キャスト", "体入", "派遣（モア）", "派遣（ジュエルズ）", "ヘルプ（サエラ）", "ヘルプ（花水岐）"]);
+  const managementRoles = new Set(["ママ", "チーママ", "マネージャ", "マネージャー"]);
+  const staffCount = casts.filter((cast) => staffRoles.has(cast.role)).length;
+  const managementCount = casts.filter((cast) => managementRoles.has(cast.role)).length;
+  return `${staffCount}+${managementCount}`;
+}
+
 function clearReportCells(sheet, startRow, count) {
   const columns = ["D", "G", "I", "K", "M", "O", "Q"];
   for (let row = startRow; row < startRow + count; row += 1) {
     columns.forEach((column) => {
       sheet.getCell(`${column}${row}`).value = null;
     });
+  }
+}
+
+function prepareReportSummaryCells(sheet) {
+  if (sheet.getCell("H45").isMerged || sheet.getCell("N45").isMerged) {
+    sheet.unMergeCells("C45:R46");
   }
 }
 
@@ -595,7 +609,7 @@ async function exportTodaySalesReport() {
       throw new Error("Excelテンプレートを取得する機能がこのブラウザで利用できません。");
     }
 
-    const response = await fetchFile("data/list/list_cast.xlsx?v=20260706-9");
+    const response = await fetchFile("data/list/list_cast.xlsx?v=20260706-10");
     if (!response.ok) {
       throw new Error("list_cast.xlsx テンプレートを読み込めませんでした。");
     }
@@ -607,6 +621,7 @@ async function exportTodaySalesReport() {
     const startRow = 4;
 
     clearReportCells(sheet, startRow, Math.max(casts.length + 10, 60));
+    prepareReportSummaryCells(sheet);
 
     casts.forEach((cast, index) => {
       const row = startRow + index;
@@ -622,6 +637,11 @@ async function exportTodaySalesReport() {
       sheet.getCell(`O${row}`).value = stats.nominations;
       sheet.getCell(`Q${row}`).value = stats.inStore;
     });
+
+    sheet.getCell("C45").value = state.tables.length;
+    sheet.getCell("H45").value = state.tables.reduce((sum, table) => sum + Number(table.guests || 0), 0);
+    sheet.getCell("N45").value = attendanceCountLabel(casts);
+    sheet.getCell("C48").value = state.tables.reduce((sum, table) => sum + totalSale(table), 0);
 
     const filename = `${businessDateStamp()}list_cast.xlsx`;
     const buffer = await workbook.xlsx.writeBuffer();
