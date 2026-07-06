@@ -500,7 +500,7 @@ function renderTodayCasts() {
         <span class="avatar">${initials(cast.name)}</span>
         <div>
           <strong>${cast.name}</strong>
-          <span>指名 ${stats.nominations}本 / 場内 ${stats.inStore}本</span>
+          <span>同伴 ${stats.companion}本 / 指名 ${stats.nominations}本 / 場内 ${stats.inStore}本</span>
         </div>
       </div>
       <div class="shift-controls">
@@ -519,7 +519,7 @@ function renderTodayCasts() {
         <div>
           <strong>${cast.name}</strong>
           <span>${cast.role} / ${yen.format(cast.hourly || 0)}</span>
-          <span>指名 ${stats.nominations}本 / 場内 ${stats.inStore}本</span>
+          <span>同伴 ${stats.companion}本 / 指名 ${stats.nominations}本 / 場内 ${stats.inStore}本</span>
         </div>
       </div>
       <div class="shift-controls">
